@@ -1,0 +1,15 @@
+streamlit>=1.36
+pandas>=2.0
+requests>=2.31
+beautifulsoup4>=4.12
+fpdf2>=2.7
+python-dotenv>=1.0
+
+# Makes requests/ssl trust the Windows certificate store (needed if antivirus
+# or a corporate proxy does HTTPS scanning with its own root CA, e.g. AVG's
+# "Web/Mail Shield"). No-op / harmless on non-Windows.
+pip-system-certs>=4.0; sys_platform == "win32"
+
+# Optional: only needed for URLs flagged "needs JS rendering" in On-Demand Check.
+# After installing, also run: playwright install chromium
+# playwright>=1.44
