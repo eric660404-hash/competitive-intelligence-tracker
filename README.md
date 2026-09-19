@@ -1,5 +1,7 @@
 # Competitive Intelligence & Positioning Tracker
 
+**Live demo:** https://competitive-intelligence-tracker.streamlit.app/
+
 Logs competitor moves (launches, price changes, promos, new claims) as they're
 observed in-market, and turns them into a structured, comparable positioning
 view — so insight is captured in the moment instead of lost, and can be shared
@@ -52,3 +54,8 @@ streamlit run Home.py
 - Email notifications require `SMTP_USER`, `SMTP_PASSWORD`, and `NOTIFY_EMAIL`
   in `.env` — the check still runs and logs the observation without them, it
   just skips sending the email.
+- **Streamlit Community Cloud caveat:** the hosted demo's filesystem is
+  ephemeral — `data/tracker.db` resets whenever the app reboots (a redeploy,
+  a code push, or waking from sleep after inactivity). That's fine for a
+  portfolio demo; for real day-to-day tracking, run it locally so your data
+  persists.
