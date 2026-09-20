@@ -7,6 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 import streamlit as st
 
 from src import db, emailer, scraper
+from src.ui_helpers import select_or_add_retailer
 
 st.set_page_config(page_title="On-Demand Check", page_icon="🔎", layout="wide")
 db.init_db()
@@ -24,12 +25,12 @@ with st.expander("➕ Add a monitored URL", expanded=product_labels == {}):
     if not product_labels:
         st.info("Add a product first via **Log Observation**.")
     else:
+        product_id = st.selectbox(
+            "Product", list(product_labels.keys()), format_func=lambda pid: product_labels[pid], key="addurl_product"
+        )
+        retailer_id = select_or_add_retailer("addurl", allow_none=True)
         with st.form("add_url_form", clear_on_submit=True):
-            product_id = st.selectbox(
-                "Product", list(product_labels.keys()), format_func=lambda pid: product_labels[pid]
-            )
             url = st.text_input("URL")
-            retailer = st.text_input("Retailer / channel (label for this URL)")
             needs_js = st.checkbox(
                 "Needs JS rendering (site content loads dynamically — requires Playwright installed)"
             )
@@ -43,7 +44,7 @@ with st.expander("➕ Add a monitored URL", expanded=product_labels == {}):
                     st.error("URL is required.")
                 else:
                     db.add_monitored_url(
-                        product_id, url, retailer, needs_js,
+                        product_id, url, retailer_id, needs_js,
                         title_selector, price_selector, description_selector,
                     )
                     st.success("URL added.")
@@ -58,8 +59,10 @@ if urls_df.empty:
     st.info("No monitored URLs yet.")
 else:
     st.subheader("Monitored URLs")
+    display_df = urls_df.copy()
+    display_df["retailer_name"] = display_df["retailer_name"].fillna("(none)")
     st.dataframe(
-        urls_df[["brand", "product_name", "retailer", "url", "needs_js", "last_price", "last_checked_at"]],
+        display_df[["brand_name", "category", "retailer_name", "url", "needs_js", "last_price", "last_checked_at"]],
         use_container_width=True,
         hide_index=True,
     )
@@ -84,7 +87,7 @@ else:
                     "price_selector": row.price_selector,
                     "description_selector": row.description_selector,
                 }
-                product_label = f"{row.brand} - {row.product_name}"
+                product_label = f"{row.brand_name} ({row.category})"
                 try:
                     snapshot = scraper.fetch_snapshot(row.url, bool(row.needs_js), selectors)
                 except scraper.FetchError as exc:
@@ -98,13 +101,17 @@ else:
                 if changes:
                     move_type = scraper.infer_move_type(changes)
                     detail_lines = [f"{c['field'].title()}: '{c['old']}' -> '{c['new']}'" for c in changes]
+                    if row.retailer_id:
+                        obs_retailer_id = row.retailer_id
+                    else:
+                        obs_retailer_id = db.add_retailer("(from URL check)", "Independent account", "Unknown")
                     db.add_observation(
                         product_id=row.product_id,
-                        retailer=row.retailer or "(from URL check)",
-                        date_observed=date.today(),
+                        retailer_id=obs_retailer_id,
+                        observed_date=date.today(),
                         move_type=move_type,
                         move_detail="Auto-detected change on check:\n" + "\n".join(detail_lines),
-                        insight_read="",
+                        your_read="",
                         source="auto",
                         is_reviewed=False,
                     )
@@ -139,15 +146,17 @@ if pending.empty:
     st.caption("Nothing waiting for review.")
 else:
     for row in pending.itertuples():
-        with st.expander(f"{row.date_observed} — {row.brand} {row.product_name} @ {row.retailer} ({row.move_type})"):
-            move_detail = st.text_area("Move detail", value=row.move_detail, key=f"detail_{row.id}")
-            insight_read = st.text_area("Your read", value=row.insight_read, key=f"read_{row.id}")
+        with st.expander(
+            f"{row.observed_date} — {row.brand_name} ({row.category}) @ {row.retailer_name} ({row.move_type})"
+        ):
+            move_detail = st.text_area("Move detail", value=row.move_detail, key=f"detail_{row.observation_id}")
+            your_read = st.text_area("Your read", value=row.your_read, key=f"read_{row.observation_id}")
             c1, c2 = st.columns(2)
-            if c1.button("Confirm", key=f"confirm_{row.id}", type="primary"):
+            if c1.button("Confirm", key=f"confirm_{row.observation_id}", type="primary"):
                 db.update_observation(
-                    int(row.id), move_detail=move_detail, insight_read=insight_read, is_reviewed=True
+                    row.observation_id, move_detail=move_detail, your_read=your_read, is_reviewed=True
                 )
                 st.rerun()
-            if c2.button("Discard", key=f"discard_{row.id}"):
-                db.delete_observation(int(row.id))
+            if c2.button("Discard", key=f"discard_{row.observation_id}"):
+                db.delete_observation(row.observation_id)
                 st.rerun()

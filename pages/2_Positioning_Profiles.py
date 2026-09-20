@@ -25,28 +25,29 @@ product_id = st.selectbox(
 )
 
 product = db.get_product(product_id)
+profile = db.get_profile(product_id)
 obs = db.get_observations(product_id=product_id)
-retailers_found = sorted(set(obs["retailer"])) if not obs.empty else []
+retailers_found = sorted(set(obs["retailer_name"])) if not obs.empty else []
 
-st.subheader(f"{product['brand']} — {product['product_name']}")
+st.subheader(f"{product['brand_name']} ({product['category']})")
 
 with st.form("profile_form"):
     c1, c2 = st.columns(2)
-    target_segment = c1.text_input("Target segment", value=product["target_segment"])
-    price_tier = c2.text_input("Price tier", value=product["price_tier"])
-    key_message = st.text_input("Key message / claim", value=product["key_message"])
-    notes = st.text_area("Notes", value=product["notes"], height=80)
+    target_segment = c1.text_input("Target segment", value=profile["target_segment"])
+    price_tier = c2.text_input("Price tier", value=profile["price_tier"])
+    key_message = st.text_input("Key message / claim", value=profile["key_message"])
+    profile_notes = st.text_area("Notes", value=profile["profile_notes"], height=80)
 
     st.text_input("Retailer(s) it's found in (auto-derived from observations)",
                    value=", ".join(retailers_found) if retailers_found else "—", disabled=True)
 
     if st.form_submit_button("Save profile", type="primary"):
-        db.update_product(
+        db.save_profile(
             product_id,
             target_segment=target_segment,
-            price_tier=price_tier,
             key_message=key_message,
-            notes=notes,
+            price_tier=price_tier,
+            profile_notes=profile_notes,
         )
         st.success("Profile saved.")
         st.rerun()
@@ -59,13 +60,13 @@ if obs.empty:
 else:
     for row in obs.itertuples():
         st.markdown(
-            f"**{row.date_observed}** · {row.retailer} · _{row.move_type}_"
+            f"**{row.observed_date}** · {row.retailer_name} · _{row.move_type}_"
             + ("  ⏳ pending review" if not row.is_reviewed else "")
         )
         if row.move_detail:
             st.write(f"What happened: {row.move_detail}")
-        if row.insight_read:
-            st.write(f"Read: {row.insight_read}")
+        if row.your_read:
+            st.write(f"Read: {row.your_read}")
         st.markdown("---")
 
 st.divider()

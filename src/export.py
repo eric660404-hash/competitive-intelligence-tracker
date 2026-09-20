@@ -23,9 +23,10 @@ def _truncate(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "..."
 
 
-def build_one_pager(products_df, observations_df, retailers_by_product: dict) -> bytes:
-    """products_df: one row per tracked product (positioning fields).
+def build_one_pager(products_df, observations_df, profiles_by_product: dict, retailers_by_product: dict) -> bytes:
+    """products_df: one row per tracked product (brands_products master table).
     observations_df: all observations, used to pull the latest 1-2 reads per product.
+    profiles_by_product: {product_id: positioning_profiles dict}
     retailers_by_product: {product_id: "Retailer A, Retailer B"}
     """
     pdf = OnePager(orientation="L", unit="mm", format="A4")
@@ -33,8 +34,8 @@ def build_one_pager(products_df, observations_df, retailers_by_product: dict) ->
     pdf.add_page()
 
     # --- Comparison table -------------------------------------------------
-    col_widths = [35, 45, 40, 35, 60, 40]
-    headers = ["Brand", "Product", "Target segment", "Price tier", "Key message", "Retailers"]
+    col_widths = [35, 30, 40, 35, 60, 40]
+    headers = ["Brand / product", "Category", "Target segment", "Price tier", "Key message", "Retailers"]
 
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(235, 235, 240)
@@ -44,13 +45,14 @@ def build_one_pager(products_df, observations_df, retailers_by_product: dict) ->
 
     pdf.set_font("Helvetica", "", 8)
     for row in products_df.itertuples():
+        profile = profiles_by_product.get(row.product_id, {})
         values = [
-            _truncate(row.brand, 22),
-            _truncate(row.product_name, 28),
-            _truncate(row.target_segment, 26),
-            _truncate(row.price_tier, 20),
-            _truncate(row.key_message, 42),
-            _truncate(retailers_by_product.get(row.id, ""), 26),
+            _truncate(row.brand_name, 22),
+            _truncate(row.category, 18),
+            _truncate(profile.get("target_segment", ""), 26),
+            _truncate(profile.get("price_tier", ""), 20),
+            _truncate(profile.get("key_message", ""), 42),
+            _truncate(retailers_by_product.get(row.product_id, ""), 26),
         ]
         for w, v in zip(col_widths, values):
             pdf.cell(w, 7, v, border=1)
@@ -64,18 +66,18 @@ def build_one_pager(products_df, observations_df, retailers_by_product: dict) ->
 
     for row in products_df.itertuples():
         product_obs = (
-            observations_df[observations_df["product_id"] == row.id]
-            .sort_values("date_observed", ascending=False)
+            observations_df[observations_df["product_id"] == row.product_id]
+            .sort_values("observed_date", ascending=False)
             .head(2)
         )
         if product_obs.empty:
             continue
         pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 7, f"{row.brand} - {row.product_name}", ln=True)
+        pdf.cell(0, 7, f"{row.brand_name} ({row.category})", ln=True)
         pdf.set_font("Helvetica", "", 9)
         for obs in product_obs.itertuples():
-            read = _truncate(obs.insight_read or obs.move_detail, 140)
-            line = f"  {obs.date_observed} ({obs.retailer}, {obs.move_type}): {read}"
+            read = _truncate(obs.your_read or obs.move_detail, 140)
+            line = f"  {obs.observed_date} ({obs.retailer_name}, {obs.move_type}): {read}"
             pdf.multi_cell(0, 5, line)
         pdf.ln(1)
 

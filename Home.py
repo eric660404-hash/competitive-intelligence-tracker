@@ -39,7 +39,7 @@ else:
     st.subheader("Recent observations")
     st.dataframe(
         observations.head(10)[
-            ["date_observed", "brand", "product_name", "retailer", "move_type", "move_detail", "insight_read"]
+            ["observed_date", "brand_name", "category", "retailer_name", "move_type", "move_detail", "your_read"]
         ],
         use_container_width=True,
         hide_index=True,

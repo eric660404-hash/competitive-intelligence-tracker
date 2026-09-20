@@ -23,17 +23,27 @@ if products.empty:
     st.info("Nothing to export yet — log some observations first.")
     st.stop()
 
+profiles_by_product = {pid: db.get_profile(pid) for pid in products["product_id"]}
 retailers_by_product = {}
-for pid in products["id"]:
+for pid in products["product_id"]:
     obs = observations[observations["product_id"] == pid]
-    retailers_by_product[pid] = ", ".join(sorted(set(obs["retailer"]))) if not obs.empty else ""
+    retailers_by_product[pid] = ", ".join(sorted(set(obs["retailer_name"]))) if not obs.empty else ""
 
 st.subheader("Preview")
-preview_cols = ["brand", "product_name", "target_segment", "price_tier", "key_message"]
-st.dataframe(products[preview_cols], use_container_width=True, hide_index=True)
+preview_rows = [
+    {
+        "brand_name": row.brand_name,
+        "category": row.category,
+        "target_segment": profiles_by_product[row.product_id]["target_segment"],
+        "price_tier": profiles_by_product[row.product_id]["price_tier"],
+        "key_message": profiles_by_product[row.product_id]["key_message"],
+    }
+    for row in products.itertuples()
+]
+st.dataframe(preview_rows, use_container_width=True, hide_index=True)
 
 if st.button("Generate one-pager PDF", type="primary"):
-    pdf_bytes = export.build_one_pager(products, observations, retailers_by_product)
+    pdf_bytes = export.build_one_pager(products, observations, profiles_by_product, retailers_by_product)
     st.session_state["one_pager_pdf"] = pdf_bytes
     st.success("One-pager generated.")
 

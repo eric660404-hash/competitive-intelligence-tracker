@@ -29,8 +29,9 @@ streamlit run Home.py
 
 ## Pages
 
-- **Log Observation** — capture a competitor move: brand/product, retailer,
-  date, move type, what happened, and your read on why.
+- **Log Observation** — capture a competitor move: pick (or add) the retailer
+  and the brand/product from the shared master lists, then date, move type,
+  what happened, and your read on why.
 - **Positioning Profiles** — a per-product profile (target segment, key
   message, price tier) that rolls up all your observations into an insight
   history.
@@ -42,6 +43,21 @@ streamlit run Home.py
   something changed. No background/scheduled monitoring in v1.
 - **Export** — generate a clean one-pager PDF summarizing the positioning
   table and your most recent reads per product.
+
+## Shared data layer
+
+Retailers and products are looked up or created against two master tables
+(`retailers`, `brands_products`) instead of being free-typed per entry, and
+`observations` / `positioning_profiles` reference them by `retailer_id` /
+`product_id`. The id for a given name (a slug like `chain_b`) is generated the
+same way as in [promo-roi-calculator](https://github.com/eric660404-hash/promo-roi-calculator)'s
+`data_layer.py`, so entering the same retailer/brand name in either tool
+produces the same id — the design this repo and the promo tool are meant to
+share is written up in [data-layer-technical-brief.md](data-layer-technical-brief.md).
+Each tool still keeps its own local SQLite file; there's no single physical
+database yet (that would break the hosted Streamlit Cloud demos, which don't
+share a filesystem), so cross-tool querying today means pointing a future
+chat/RAG layer at both `.db` files, matching rows by id.
 
 ## Notes
 
